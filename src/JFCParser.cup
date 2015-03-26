@@ -1,0 +1,297 @@
+/* ----------------------Preliminary Declarations Section--------------------*/
+
+/* Importar la clase java_cup.runtime.*  */
+import java_cup.runtime.*;
+import java.util.*;
+import javax.swing.JOptionPane;
+
+/* Parser code para cambiar la forma en que el parser presenta los es (incluye
+   linea y columna del error). */
+
+parser code {:
+
+    public void syntax_error(Symbol s) {
+       if (!s.value.equals(""))
+            report_error("Sintáctico en la", s);
+    }
+
+    public void report_error(String message, Object info) {
+        StringBuffer m = new StringBuffer("Error ");
+        m.append(message);
+        java_cup.runtime.Symbol s = null;
+        if (info instanceof java_cup.runtime.Symbol) {
+            s = ((java_cup.runtime.Symbol) info);
+
+            if (s.left >= 0) {
+                m.append(" linea " + (s.left + 1));
+
+                if (s.right >= 0) {
+                    m.append(", columna " + (s.right + 1));
+                }
+            }
+            if (!s.value.equals(""))
+            {
+                m.append(". No se esperaba el símbolo: '" + s.value + "'");
+
+
+            
+             }
+        }
+         System.err.println(m);
+    }
+
+
+    public void report_fatal_error(String message, Object info) {
+        String msj_fatal = ", no se esperaba fin de archivo.";
+        report_error(msj_fatal, info);
+
+    }
+:};
+
+
+
+/* ------------Declaration of Terminals and Non Terminals Section----------- */
+
+/* Terminals (tokens returned by the scanner).  */
+terminal	MAS,MENOS,MULTIPLICACION,DIVISION,IGUAL,DIFERENTE,
+		MENORQUE,MAYORQUE,MAYORIGUAL,MENORIGUAL,AND,OR,NOT,IN,MOD,DIV,
+		BOOLEAN,INTEGER,STRING,FLOAT,CHAR,IF,ELSE,WHILE,
+		FOR,TO,BEGIN,PROCEDURE,PROGRAM,
+		FUNCTION,RETURN,END,VAR,ASIGNACION,COMA,PUNTO,PUNTOCOMA,
+		DOSPUNTOS,PARIZQ,PARDER,TRUE,
+		FALSE,T_CHAR,WRITE,READ,NUM,ID,T_STRING,LOOP,ENDLOOP,ENDIF,
+                SWITCH, CASE, BREAK, DEFAULT, ENDSWITCH,NUMFLOAT;
+
+/* Non terminals used in the grammar section. */
+nonterminal	signo,declaracion_variable,operador_suma, operador_multiplicacion,
+                operador_relacional,hasta,declaracion_procedure,encabezamiento_procedure,
+                grupo_parametros,
+		parte_declaracion_variable,parte_declaracion_procedure,parte_declaracion_funciones,
+		declaracion_var,declaracion_funcion,encabezamiento_funcion,tipo_primitivo,
+                switch_sentecia,switch_cases,switch_case;
+
+nonterminal  tipo;
+
+nonterminal  cadena,bloque,bloque_f,integer_sin_signo,variable, expresion_if, operador_condicional,
+		     expresion, expresion_simple, termino, factor,sentencia, sentencia_simple,
+		     asignacion_sentencia,sentencia_compuesta,seccion_sentencia,programa,
+                     llamada_funcion,parametro_actual,sentencia_estructurada,
+                     if_sentencia, while_sentencia,for_sentencia, parte_else,
+                     valor_inicial, valor_final, lectura_sentencia,
+                     lectura,escritura_sentencia,escritura,retorno;
+
+nonterminal String   parametros;
+
+/* -------------Precedence and Associatively of Terminals Section----------- */
+
+precedence left MAS, MENOS;
+precedence left MULTIPLICACION, DIVISION, MOD, DIV;
+precedence nonassoc ELSE;
+start with programa;
+/*-----------------------------------------------------------------*/
+/* ----------------------------Grammar Section-------------------- */
+/*-----------------------------------------------------------------*/
+
+/*-------------enteros---------------------*/
+signo ::= MAS| MENOS;
+integer_sin_signo::= NUM;
+
+/*-------------variables------------------*/
+declaracion_variable ::= ID:id COMA declaracion_variable
+
+			 |ID:id DOSPUNTOS tipo:t
+|ID  DOSPUNTOS error
+ ;
+
+variable ::= ID: id ;
+
+
+/*-------------expresiones------------------*/
+expresion_if ::= expresion
+             | expresion operador_condicional expresion_if;
+
+
+expresion ::= expresion_simple:e_s
+	      |expresion_simple operador_relacional expresion_simple;
+
+
+expresion_simple ::= termino:term
+		    |expresion_simple:e_s operador_suma:o_s termino:term
+		    |signo termino:term;
+
+termino::=factor:fact
+	  |termino:term operador_multiplicacion factor:fact ;
+
+factor::= variable:var
+	  |integer_sin_signo
+          |llamada_funcion:l_f
+	  |PARIZQ expresion:exp PARDER
+          |cadena:cad
+	  |TRUE
+	  |FALSE
+	  |NOT factor:fact ;
+
+cadena::=T_STRING
+        |T_CHAR;
+/*-------------operadores-------------------------*/
+operador_suma::=MAS|MENOS|OR;
+operador_multiplicacion::=MULTIPLICACION|DIVISION|DIV|AND|MOD;
+operador_relacional::=IGUAL|DIFERENTE|MAYORQUE|MENORQUE|MAYORIGUAL|MENORIGUAL|IN;
+operador_condicional ::= AND|OR;
+
+
+/*-------------llamada a funcion------------------*/
+llamada_funcion::=ID:id PARIZQ PARDER
+		  |ID:id PARIZQ parametros:param PARDER
+                  |ID:id PARIZQ parametros:param error PUNTOCOMA ;
+
+parametros::=parametro_actual:p_a COMA parametros:p
+	     | parametro_actual:p_a ;
+
+/*-------------sentencias--------------------------*/
+sentencia::= sentencia_simple:s_s
+	     |sentencia_estructurada:s_e ;
+
+sentencia_simple ::= asignacion_sentencia:a_s
+		     | llamada_funcion:l_f PUNTOCOMA
+		     | lectura_sentencia:l_s
+		     | escritura_sentencia:e_s
+                     ;
+
+/*-------------sentencia asignacion--------------------------*/
+asignacion_sentencia ::= variable:var ASIGNACION expresion:exp PUNTOCOMA
+
+                        |variable:var ASIGNACION error PUNTOCOMA
+
+                        |variable:var IGUAL error expresion:exp PUNTOCOMA
+
+                        |variable:var DOSPUNTOS error expresion:exp PUNTOCOMA;
+
+/*-------------sentencia estructurada--------------------------*/
+sentencia_estructurada::=sentencia_compuesta:s_c
+			| if_sentencia:i_s
+			| while_sentencia:w_s
+			| for_sentencia:f_s
+                        | switch_sentecia;
+                        
+
+
+sentencia_compuesta::= BEGIN seccion_sentencia:s_s END
+                       |BEGIN END
+                       |BEGIN seccion_sentencia:s_s error ;
+
+
+seccion_sentencia::= sentencia:s  seccion_sentencia
+		     |sentencia:s ;
+
+/*------------bloques de decision--------------------------*/
+
+if_sentencia ::= IF expresion:exp seccion_sentencia:s ENDIF PUNTOCOMA 
+	        |IF expresion:exp seccion_sentencia:s parte_else:p_e ENDIF PUNTOCOMA;
+
+parte_else ::= ELSE seccion_sentencia:s ;
+
+switch_sentecia         ::= SWITCH ID switch_cases ENDSWITCH PUNTOCOMA
+                        ;
+
+switch_cases            ::= switch_case
+                        | switch_case switch_cases
+                        ;
+
+switch_case            ::= CASE T_CHAR DOSPUNTOS seccion_sentencia:s BREAK PUNTOCOMA
+                        | CASE NUM DOSPUNTOS seccion_sentencia:s BREAK PUNTOCOMA
+                        | CASE T_CHAR DOSPUNTOS seccion_sentencia:s
+                        | CASE NUM DOSPUNTOS seccion_sentencia:s
+                        | DEFAULT DOSPUNTOS seccion_sentencia:s BREAK PUNTOCOMA
+                        ;                                                          
+
+
+while_sentencia ::= WHILE expresion:exp LOOP seccion_sentencia:s ENDLOOP PUNTOCOMA;
+
+for_sentencia ::= FOR ID:id IN valor_inicial:v_i hasta valor_final:v_f LOOP seccion_sentencia:s ENDLOOP PUNTOCOMA;
+
+hasta::= TO;
+
+valor_inicial ::= expresion:exp ;
+
+valor_final ::= expresion:exp ;
+
+
+/*------------declaracion procedimientos--------------------------*/
+declaracion_procedure ::= encabezamiento_procedure  bloque  PUNTOCOMA ;
+
+encabezamiento_procedure ::= PROCEDURE ID:id PUNTOCOMA;
+
+grupo_parametros::=tipo:t ID:id COMA grupo_parametros
+                   |tipo:t ID:id ;
+
+parametro_actual::=expresion:exp ;
+
+/*--------------bloque---------------------------------------*/
+bloque ::= parte_declaracion_variable parte_declaracion_funciones sentencia_compuesta:s_c ;
+
+bloque_f ::= parte_declaracion_variable sentencia_compuesta:s_c retorno;
+
+retorno ::= RETURN ID;
+
+/*--------------parte declaracion variables---------------------------------------*/
+parte_declaracion_variable ::= |
+				VAR declaracion_var;
+declaracion_var::= |
+		   declaracion_variable PUNTOCOMA declaracion_var;
+
+/*--------------parte declaracion funciones---------------------------------------*/
+
+parte_declaracion_funciones ::= |
+				declaracion_funcion parte_declaracion_funciones;
+
+declaracion_funcion::=encabezamiento_funcion:e_f bloque_f:b_f  PUNTOCOMA;
+
+encabezamiento_funcion::= FUNCTION tipo_primitivo:t ID:id
+
+		      |FUNCTION tipo_primitivo:t ID:id PARIZQ  grupo_parametros PARDER
+
+                      |FUNCTION ID:id error PUNTOCOMA;
+
+
+/*--------------parte declaracion procedimientos---------------------------------------*/
+parte_declaracion_procedure ::= |
+				declaracion_procedure parte_declaracion_procedure;
+
+/*----------------------------tipos----------------------------------------------------*/
+tipo::= tipo_primitivo:t_prim;
+
+tipo_primitivo::= CHAR:c
+                  |STRING:s
+                  |INTEGER:i
+                  |BOOLEAN:b
+                  |FLOAT;
+
+/*--------------programa---------------------------------------------------------------*/
+programa::=PROGRAM ID:id PUNTOCOMA  bloque PUNTO
+
+           | error ID PUNTOCOMA bloque PUNTO
+           |PROGRAM ID  error bloque PUNTO;
+
+/*--------------lectura y escritura---------------------------------------------------------------*/
+
+lectura_sentencia ::= READ PARIZQ lectura:lect PARDER PUNTOCOMA
+
+                      |READ PARIZQ  error PARDER PUNTOCOMA
+                      |READ PARIZQ  error
+
+                      ;
+
+lectura::= variable:var
+
+                    ;
+
+escritura_sentencia::= WRITE PARIZQ escritura:esc PARDER PUNTOCOMA
+                      |WRITE PARIZQ error PARDER PUNTOCOMA
+
+                      ;
+
+escritura ::= cadena:cad COMA variable:var
+
+	      |cadena:cad
+              ;
